@@ -68,6 +68,12 @@ export const config = {
   nerDefaults: {
     region: process.env.NER_DEFAULT_REGION || 'NER',
     language: process.env.DEFAULT_LANGUAGE || 'as',
+  },
+  abdm: {
+    clientId: process.env.ABDM_CLIENT_ID || null,
+    clientSecret: process.env.ABDM_CLIENT_SECRET || null,
+    gatewayUrl: process.env.ABDM_GATEWAY_URL || 'https://dev.abdm.gov.in/gateway',
+    useMock: process.env.ABDM_USE_MOCK !== 'false',
   }
 };
 
