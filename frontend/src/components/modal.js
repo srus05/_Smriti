@@ -100,9 +100,7 @@ class RoleModalManager {
     // Direct routing to role-tailored authentication page
     this.close();
     window.location.href = `/auth?role=${targetRole}`;
-  }
-}
 
-document.addEventListener('DOMContentLoaded', () => {
-  window.smritiModal = new RoleModalManager();
-});
+    document.addEventListener('DOMContentLoaded', () => {
+      window.smritiModal = new RoleModalManager();
+    });

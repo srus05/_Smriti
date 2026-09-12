@@ -169,6 +169,7 @@ export const userService = {
 
       const updated = {
         ...existing,
+        role: intendedRole || existing.role,
         name: name || existing.name,
         email: email ? email.trim().toLowerCase() : existing.email,
         photoURL: photoURL || existing.photoURL,

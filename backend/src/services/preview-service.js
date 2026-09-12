@@ -31,7 +31,7 @@ export const previewService = {
       reminderService.getRemindersForElderly(elderlyUserId)
     ]);
 
-    // 3. Resolve authentic real name (avoiding generic placeholders)
+    // 3. Resolve authentic real name (personalized profile displayName takes precedence)
     let realName = '';
     if (profile?.displayName && profile.displayName !== 'Elderly User' && profile.displayName !== 'Smriti User') {
       realName = profile.displayName.trim();
