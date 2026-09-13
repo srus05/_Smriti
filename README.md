@@ -4,10 +4,7 @@
 
 ### Personalized cognitive care for elderly dementia patients — built for their language, their culture, their family.
 
-![SIH 2026](https://img.shields.io/badge/Smart%20India%20Hackathon-2026-orange?style=for-the-badge)
-![Problem Statement](https://img.shields.io/badge/PS-SIH26003-blue?style=for-the-badge)
-![Status](https://img.shields.io/badge/status-active%20development-brightgreen?style=for-the-badge)
-![Team](https://img.shields.io/badge/team-localhost%3A4040-purple?style=for-the-badge)
+
 
 **Problem Statement:** AI-Based Cognitive Gaming and Memory Assistance Platform for Elderly Dementia Patients in the North Eastern Region (NER) · MDoNER
 
@@ -18,13 +15,12 @@
 ## 📑 Table of Contents
 
 - [🌱 Overview](#-overview)
-- [✅ SIH Problem Statement Alignment](#-sih-problem-statement-alignment)
 - [🚀 Core Features](#-core-features)
 - [💡 What Makes Smriti Different](#-what-makes-smriti-different)
 - [🎮 Cognitive Activity System](#-cognitive-activity-system)
 - [📈 Adaptive Difficulty](#-adaptive-difficulty)
 - [🗣️ Multilingual + Voice](#️-multilingual--voice)
-- [🎭 NER Cultural Personalization](#-ner-cultural-personalization)
+
 - [💊 Reminder & Care Support](#-reminder--care-support-system)
 - [📡 Offline Architecture](#-offline-architecture)
 - [🔐 Security & Privacy](#-security--privacy)
@@ -271,9 +267,9 @@ These are support tools, **not** medical/diagnostic features.
 
 <div align="center">
 
-### `localhost:4040`
+### `FourBits'
 
-| Hrisit | Nahida | Shreejata | Sruti | Hrithik | Aryan |
+| Hrisit | Shreejata | Sruti | Aryan |
 |---|---|---|---|---|---|
 
 </div>
@@ -282,7 +278,7 @@ These are support tools, **not** medical/diagnostic features.
 
 <div align="center">
 
-**🏆 Built for Smart India Hackathon 2026**
+
 
 > 📝 *Sections marked 🚧 TBD need confirmation from your full phase-by-phase implementation reports (test results, API routes, project structure, deployment platform, env vars, storage-migration status) before this is submission-ready.*
 
