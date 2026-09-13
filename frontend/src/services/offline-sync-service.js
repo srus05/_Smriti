@@ -1,17 +1,23 @@
 /**
  * SMRITI OFFLINE SYNC SERVICE
- * Manages local caching of personalized cognitive activities and queues offline sessions
- * for automatic synchronization when connectivity is restored.
+ * Keeps locally recorded cognitive sessions available until the authenticated
+ * elderly user can synchronize them with the existing batch sync endpoint.
  */
+
+import { offlineDb } from './offline-db.js';
 
 const QUEUE_KEY = 'smriti_offline_session_queue';
 const CACHE_PREFIX = 'smriti_cached_activity_pack_';
 
 class OfflineSyncService {
   constructor() {
-    this.isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
-    this.isSyncing = false;
+    this.isOnline = typeof navigator === 'undefined' ? true : navigator.onLine;
+    this.connectivityQuality = this.isOnline ? 'online' : 'offline';
     this.listeners = new Set();
+    this.isSyncing = false;
+    this.retryTimer = null;
+    this.retryDelayMs = 3000;
+    this.maxRetryDelayMs = 30000;
 
     if (typeof window !== 'undefined') {
       window.addEventListener('online', () => this.handleOnline());
@@ -19,176 +25,202 @@ class OfflineSyncService {
     }
   }
 
+  getStatusMessage(status) {
+    return {
+      online: 'Online',
+      degraded: 'Weak connection � using saved activities',
+      offline: 'Offline � using saved activities',
+      syncing: 'Syncing saved sessions�',
+      synced: 'Progress synchronized',
+      queued: 'Activity progress saved on this device.'
+    }[status] || 'Online';
+  }
+
   onStatusChange(fn) {
+    if (typeof fn !== 'function') return () => {};
     this.listeners.add(fn);
+    fn({ isOnline: this.isOnline, quality: this.connectivityQuality, status: this.connectivityQuality, message: this.getStatusMessage(this.connectivityQuality) });
     return () => this.listeners.delete(fn);
   }
 
-  notifyStatus(status, message) {
-    this.listeners.forEach(fn => {
+  notifyStatus(status, message = this.getStatusMessage(status)) {
+    if (status === 'online' || status === 'degraded' || status === 'offline') this.connectivityQuality = status;
+    for (const listener of this.listeners) {
       try {
-        fn({ isOnline: this.isOnline, status, message });
-      } catch (e) {
-        console.error('[OfflineSync] Status listener error:', e);
+        listener({ isOnline: this.isOnline, quality: this.connectivityQuality, status, message });
+      } catch (error) {
+        console.error('[OfflineSync] Status listener error:', error);
       }
-    });
+    }
+  }
+
+  checkConnectivity() {
+    const browserOnline = typeof navigator === 'undefined' || navigator.onLine;
+    if (!browserOnline) {
+      this.handleOffline();
+      return 'offline';
+    }
+    if (!this.isOnline) {
+      void this.handleOnline();
+      return 'online';
+    }
+    return this.connectivityQuality;
   }
 
   handleOffline() {
     this.isOnline = false;
-    this.notifyStatus('offline', 'Offline mode — your activities are still available.');
+    this.connectivityQuality = 'offline';
+    this.notifyStatus('offline');
   }
 
   async handleOnline() {
     this.isOnline = true;
-    this.notifyStatus('syncing', 'Syncing saved sessions...');
-    await this.syncPendingQueue();
+    this.connectivityQuality = 'online';
+    this.retryDelayMs = 3000;
+    this.notifyStatus('syncing', 'Back online � syncing your progress�');
+    return this.syncPendingQueue();
   }
 
-  /**
-   * Caches a personalized activity pack locally
-   */
-  cacheActivityPack(elderlyUserId, pack) {
+  async cacheActivityPack(elderlyUserId, pack) {
     if (!elderlyUserId || !pack) return;
+    const cachedAt = new Date().toISOString();
     try {
-      localStorage.setItem(`${CACHE_PREFIX}${elderlyUserId}`, JSON.stringify({
-        cachedAt: new Date().toISOString(),
-        pack
-      }));
-    } catch (e) {
-      console.warn('[OfflineSync] Failed to cache activity pack:', e);
+      await offlineDb.set('activityPacks', { id: `pack_${elderlyUserId}`, elderlyUserId, pack, cachedAt });
+      if (Array.isArray(pack.activities)) {
+        for (const activity of pack.activities) {
+          if (activity?.activityId) await offlineDb.set('activities', { ...activity, elderlyUserId });
+        }
+      }
+    } catch (error) {
+      console.warn('[OfflineSync] IndexedDB activity cache unavailable:', error);
+    }
+    try {
+      localStorage.setItem(`${CACHE_PREFIX}${elderlyUserId}`, JSON.stringify({ cachedAt, pack }));
+    } catch (error) {
+      console.warn('[OfflineSync] local activity cache unavailable:', error);
     }
   }
 
-  /**
-   * Retrieves cached activity pack when offline
-   */
-  getCachedActivityPack(elderlyUserId) {
+  async getCachedActivityPack(elderlyUserId) {
     if (!elderlyUserId) return null;
     try {
+      const cached = await offlineDb.get('activityPacks', `pack_${elderlyUserId}`);
+      if (cached?.pack) return cached.pack;
+    } catch (error) {
+      console.warn('[OfflineSync] IndexedDB activity lookup unavailable:', error);
+    }
+    try {
       const raw = localStorage.getItem(`${CACHE_PREFIX}${elderlyUserId}`);
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      if (parsed && typeof parsed === 'object' && parsed.pack && typeof parsed.pack === 'object') {
-        return parsed.pack;
-      }
-    } catch (e) {
-      console.warn('[OfflineSync] Failed to read cached activity pack:', e);
+      const cached = raw ? JSON.parse(raw) : null;
+      return cached?.pack && typeof cached.pack === 'object' ? cached.pack : null;
+    } catch (error) {
+      console.warn('[OfflineSync] local activity lookup unavailable:', error);
+      return null;
     }
-    return null;
   }
 
-  /**
-   * Queues an offline session locally
-   */
-  queueOfflineSession(session) {
+  async queueOfflineSession(session) {
     if (!session || typeof session !== 'object') return;
+    const id = session.id || session.activityId || `sess_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+    const queuedSession = { ...session, id, offlineRecorded: true, queuedAt: new Date().toISOString() };
+    const queueItem = { id, session: queuedSession, status: 'pending', retryCount: 0, createdAt: queuedSession.queuedAt };
     try {
-      const queue = this.getPendingQueue();
-
-      // Ensure stable unique ID
-      const sessionId = session.id || session.activityId || `sess_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-
-      // Deduplicate by non-null ID
-      const exists = queue.some(s => s && s.id === sessionId);
-      if (!exists) {
-        queue.push({
-          ...session,
-          id: sessionId,
-          offlineRecorded: true,
-          queuedAt: new Date().toISOString()
-        });
-        localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
+      await offlineDb.set('syncQueue', queueItem);
+      await offlineDb.set('sessions', { ...queuedSession, syncStatus: 'pending' });
+    } catch (error) {
+      console.warn('[OfflineSync] IndexedDB queue unavailable; using local fallback:', error);
+      const queue = this._getLegacyQueue();
+      if (!queue.some((item) => item?.id === id)) {
+        queue.push(queuedSession);
+        try { localStorage.setItem(QUEUE_KEY, JSON.stringify(queue)); } catch (_) {}
       }
-      this.notifyStatus('queued', 'Session saved locally.');
-    } catch (e) {
-      console.error('[OfflineSync] Failed to queue offline session:', e);
     }
+    this.notifyStatus('queued');
+    if (this.isOnline) setTimeout(() => void this.syncPendingQueue(), 800);
   }
 
-  /**
-   * Gets list of pending sessions in queue
-   */
-  getPendingQueue() {
+  _getLegacyQueue() {
     try {
-      const raw = localStorage.getItem(QUEUE_KEY);
-      if (!raw) return [];
-      const parsed = JSON.parse(raw);
+      const parsed = JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]');
       return Array.isArray(parsed) ? parsed : [];
-    } catch (e) {
-      console.warn('[OfflineSync] Corrupt queue in localStorage, safely returning empty array:', e);
+    } catch (_) {
       return [];
     }
   }
 
-  /**
-   * Synchronizes pending sessions with backend API
-   */
+  async getPendingQueue() {
+    try {
+      const items = await offlineDb.getAll('syncQueue');
+      const queued = items.filter((item) => item.status === 'pending' || item.status === 'failed').map((item) => item.session);
+      if (queued.length) return queued;
+    } catch (_) {}
+    return this._getLegacyQueue();
+  }
+
   async syncPendingQueue() {
-    if (this.isSyncing) {
-      return;
-    }
-
-    const queueSnapshot = this.getPendingQueue();
-    if (queueSnapshot.length === 0) {
-      this.notifyStatus('online', 'Everything is up to date.');
-      return;
-    }
-
+    if (!this.isOnline || this.isSyncing) return { skipped: true, reason: this.isOnline ? 'already_syncing' : 'offline' };
     this.isSyncing = true;
     try {
+      const indexedItems = await offlineDb.getAll('syncQueue').catch(() => []);
+      const queuedItems = indexedItems.filter((item) => item.status === 'pending' || item.status === 'failed');
+      const sessionsById = new Map(queuedItems.map((item) => [item.id, item.session]));
+      for (const session of this._getLegacyQueue()) if (session?.id && !sessionsById.has(session.id)) sessionsById.set(session.id, session);
+      const sessions = [...sessionsById.values()];
+
+      if (!sessions.length) {
+        this.notifyStatus('online');
+        return { success: true, syncedCount: 0 };
+      }
+
       const token = localStorage.getItem('smriti_session_token') || sessionStorage.getItem('smriti_session_token');
-      const res = await fetch('/api/sync/sessions', {
+      if (!token) return { success: false, skipped: true, reason: 'missing_authentication' };
+      this.notifyStatus('syncing', `Syncing ${sessions.length} saved exercise(s)�`);
+      const response = await fetch('/api/sync/sessions', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify({ sessions: queueSnapshot })
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ sessions })
       });
+      if (!response.ok) throw new Error(`Sync request failed: HTTP ${response.status}`);
+      const result = await response.json();
+      const successfulIds = new Set(Array.isArray(result.results) ? result.results.filter((entry) => entry?.success && entry.id).map((entry) => entry.id) : []);
+      if (result.success && successfulIds.size === 0 && !result.errors) sessions.forEach((session) => successfulIds.add(session.id));
 
-      if (!res.ok) {
-        throw new Error(`Sync request failed: HTTP ${res.status}`);
+      for (const item of queuedItems) {
+        if (successfulIds.has(item.id)) await offlineDb.delete('syncQueue', item.id);
+        else await offlineDb.set('syncQueue', { ...item, status: 'failed', retryCount: (item.retryCount || 0) + 1 });
       }
+      const remainingLegacy = this._getLegacyQueue().filter((session) => !successfulIds.has(session?.id));
+      if (remainingLegacy.length) localStorage.setItem(QUEUE_KEY, JSON.stringify(remainingLegacy));
+      else localStorage.removeItem(QUEUE_KEY);
 
-      const data = await res.json();
-
-      // Determine which session IDs succeeded from backend results
-      const successfulIds = new Set();
-      if (Array.isArray(data.results)) {
-        data.results.forEach(r => {
-          if (r && r.success && r.id) {
-            successfulIds.add(r.id);
-          }
-        });
-      } else if (data.success && !data.errors) {
-        queueSnapshot.forEach(s => {
-          if (s && s.id) successfulIds.add(s.id);
-        });
-      }
-
-      // Re-read queue from storage so we don't overwrite sessions added while request was in-flight
-      const currentQueue = this.getPendingQueue();
-      const remainingQueue = currentQueue.filter(s => s && s.id && !successfulIds.has(s.id));
-
-      if (remainingQueue.length === 0) {
-        localStorage.removeItem(QUEUE_KEY);
-        this.notifyStatus('synced', 'Everything is up to date.');
+      if (successfulIds.size === sessions.length) {
+        this.retryDelayMs = 3000;
+        this.notifyStatus('synced');
       } else {
-        localStorage.setItem(QUEUE_KEY, JSON.stringify(remainingQueue));
-        if (successfulIds.size > 0) {
-          this.notifyStatus('partial_sync', `${successfulIds.size} session(s) synced, ${remainingQueue.length} session(s) waiting for retry.`);
-        } else {
-          this.notifyStatus('offline', 'Sync could not be completed. Sessions remain queued.');
-        }
+        this.connectivityQuality = 'degraded';
+        this.notifyStatus('degraded', `${successfulIds.size} session(s) synchronized; remaining sessions will retry.`);
+        this.scheduleRetry();
       }
-    } catch (e) {
-      console.warn('[OfflineSync] Auto-sync failed (network still unstable):', e);
-      this.notifyStatus('offline', 'Offline mode — your activities are still available.');
+      return result;
+    } catch (error) {
+      this.connectivityQuality = 'degraded';
+      this.notifyStatus('degraded', 'Connection is weak; saved sessions will retry automatically.');
+      this.scheduleRetry();
+      return { success: false, error: error.message };
     } finally {
       this.isSyncing = false;
     }
   }
+
+  scheduleRetry() {
+    if (!this.isOnline || this.retryTimer) return;
+    this.retryTimer = setTimeout(() => {
+      this.retryTimer = null;
+      void this.syncPendingQueue();
+    }, this.retryDelayMs);
+    this.retryDelayMs = Math.min(this.retryDelayMs * 2, this.maxRetryDelayMs);
+  }
 }
 
 export const offlineSyncService = new OfflineSyncService();
+if (typeof window !== 'undefined') window.offlineSyncService = offlineSyncService;

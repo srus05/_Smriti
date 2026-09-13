@@ -82,6 +82,18 @@ mountApiRoutes('');
 
 // Static Asset and Page Serving (for Local Dev)
 if (fs.existsSync(FRONTEND_DIR)) {
+  app.get('/sw.js', (req, res) => {
+    res.setHeader('Service-Worker-Allowed', '/');
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Content-Type', 'application/javascript');
+    res.sendFile(path.join(FRONTEND_DIR, 'sw.js'));
+  });
+
+  app.get('/manifest.json', (req, res) => {
+    res.setHeader('Content-Type', 'application/manifest+json');
+    res.sendFile(path.join(FRONTEND_DIR, 'manifest.json'));
+  });
+
   app.use(express.static(FRONTEND_DIR));
   app.use('/src', express.static(path.join(FRONTEND_DIR, 'src')));
   app.use('/components', express.static(path.join(FRONTEND_DIR, 'src/components')));

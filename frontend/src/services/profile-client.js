@@ -125,12 +125,86 @@ const ProfileClient = {
   },
 
   /**
-   * Aggregated Experience Preview
+   * Aggregated Experience Preview (with seamless offline IndexedDB fallback)
    */
   async getPreview(elderlyUserId) {
-    if (!window.ApiClient) throw new Error('ApiClient is not loaded');
-    const res = await window.ApiClient.request(`/api/preview/${elderlyUserId}`);
-    return res.experience;
+    if (!elderlyUserId) return null;
+
+    // 1. Try network if online
+    if (navigator.onLine && window.ApiClient) {
+      try {
+        const res = await window.ApiClient.request(`/api/preview/${elderlyUserId}`);
+        if (res && res.experience) {
+          // Cache in IndexedDB for offline resilience
+          if (window.offlineDb) {
+            try {
+              await window.offlineDb.set('settings', {
+                key: `preview_${elderlyUserId}`,
+                experience: res.experience,
+                cachedAt: new Date().toISOString()
+              });
+            } catch (e) {}
+          }
+          return res.experience;
+        }
+      } catch (err) {
+        console.warn('[ProfileClient] Network preview fetch failed, checking offline cache...', err.message);
+      }
+    }
+
+    // 2. Check IndexedDB cached preview
+    if (window.offlineDb) {
+      try {
+        const cached = await window.offlineDb.get('settings', `preview_${elderlyUserId}`);
+        if (cached?.experience) {
+          return cached.experience;
+        }
+
+        // 3. Synthesize from individual local stores if available
+        const [family, routines, memories, profileSettings] = await Promise.all([
+          window.offlineDb.getAll('family').catch(() => []),
+          window.offlineDb.getAll('routines').catch(() => []),
+          window.offlineDb.getAll('memories').catch(() => []),
+          window.offlineDb.get('settings', `profile_${elderlyUserId}`).catch(() => null)
+        ]);
+
+        const userFamily = family.filter(item => item.elderlyUserId === elderlyUserId);
+        const userRoutines = routines.filter(item => item.elderlyUserId === elderlyUserId);
+        const userMemories = memories.filter(item => item.elderlyUserId === elderlyUserId);
+        const photos = userMemories.filter(m => m.type === 'photo');
+        const audios = userMemories.filter(m => m.type === 'audio');
+
+        return {
+          elderlyUserId,
+          displayName: profileSettings?.profile?.displayName || 'Senior',
+          greeting: 'Welcome back to your Memory Sanctuary ❤️',
+          profile: profileSettings?.profile || { preferredLanguage: 'as' },
+          family: userFamily,
+          memories: {
+            total: userMemories.length,
+            photos,
+            audios
+          },
+          routines: userRoutines,
+          reminders: [],
+          accessibility: { largeText: true, highContrast: false }
+        };
+      } catch (idbErr) {
+        console.warn('[ProfileClient] IndexedDB preview read error:', idbErr);
+      }
+    }
+
+    // 4. Safe minimal fallback to prevent UI breakage
+    return {
+      elderlyUserId,
+      displayName: 'Senior',
+      greeting: 'Welcome to your Memory Sanctuary ❤️',
+      profile: { preferredLanguage: 'as' },
+      family: [],
+      memories: { total: 0, photos: [], audios: [] },
+      routines: [],
+      reminders: []
+    };
   }
 };
 

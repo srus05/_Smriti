@@ -6,11 +6,14 @@
   <title>Senior Space | Smriti Memory Sanctuary</title>
   <meta name="description" content="Your calm, personalized digital memory sanctuary." />
   <meta name="theme-color" content="#FDFBF7" />
+  <link rel="manifest" href="/manifest.json" />
 
   <!-- Google Fonts: Plus Jakarta Sans & Lora -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Lora:ital,wght@0,400;0,500;1,400;1,500&display=swap" rel="stylesheet" />
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -32,8 +35,6 @@
       }
     }
   </script>
-  <!-- Three.js 3D Library (r128 WebGL & WebXR Engine) -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <link rel="stylesheet" href="/src/styles/styles.css" />
   
   <style>
@@ -77,10 +78,19 @@
 
     <!-- Quick Accessibility Helpers & Logout -->
     <div class="flex items-center gap-2 sm:gap-3">
-      <div id="senior-offline-pill" class="hidden px-3 py-1 rounded-full bg-amber-100 text-amber-900 border border-amber-300 text-[11px] font-bold flex items-center gap-1.5 shadow-sm">
-        <span class="w-2 h-2 rounded-full bg-amber-500"></span>
-        <span id="senior-offline-text">Offline mode — activities ready</span>
+      <div id="senior-offline-pill" class="px-3 py-1 rounded-full border text-xs font-bold flex items-center gap-2 shadow-xs transition-all offline-status-online">
+        <span id="senior-offline-dot" class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+        <span id="senior-offline-text">🟢 Online</span>
       </div>
+
+      <button id="senior-prepare-offline-btn" class="px-3.5 sm:px-4 py-2 rounded-full bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition-all shadow-sm flex items-center gap-1.5" title="Prepare cognitive activities for offline use">
+        <span>📥</span>
+        <span class="hidden md:inline">Prepare Offline</span>
+      </button>
+
+      <button id="senior-vr-launch-btn" class="px-3.5 sm:px-4 py-2 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-sm flex items-center gap-1.5" title="Open the 3D memory sanctuary">
+        <span>◉</span><span class="hidden lg:inline">3D Sanctuary</span>
+      </button>
 
       <button id="senior-voice-greet-btn" class="px-3.5 sm:px-4 py-2 rounded-full bg-white border border-amber-300 text-amber-950 text-xs font-bold hover:bg-amber-100 transition-all shadow-sm flex items-center gap-1.5">
         <span>🗣️</span>
@@ -117,15 +127,8 @@
         </div>
       </div>
 
-      <!-- VR / 3D Sanctuary Entry Trigger -->
-      <div class="flex items-center gap-4">
-        <button id="senior-enter-vr-btn" class="hidden sm:inline-flex px-5 sm:px-6 py-3.5 rounded-2xl bg-gradient-to-r from-purple-700 via-indigo-700 to-amber-600 hover:from-purple-600 hover:to-amber-500 text-white font-extrabold text-xs sm:text-sm shadow-md hover:shadow-xl hover:scale-102 active:scale-98 transition-all items-center gap-2.5 border-2 border-purple-300">
-          <span class="text-xl">🥽</span>
-          <span id="senior-vr-btn-label">Explore 3D Sanctuary — Desktop Preview</span>
-        </button>
-        <div class="text-5xl select-none hidden md:block">
-          🏡
-        </div>
+      <div class="text-5xl select-none hidden md:block">
+        🏡
       </div>
     </div>
 
@@ -610,18 +613,6 @@
         <div id="senior-caretakers-container" class="grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
       </div>
 
-      <!-- Authorized Medical Specialists Section -->
-      <div class="bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-slate-200 space-y-4">
-        <div class="flex items-center justify-between pb-3 border-b border-slate-100">
-          <h3 class="text-base font-extrabold text-[#0F172A] flex items-center gap-2">
-            <span>🩺</span> My Connected Medical Specialists
-          </h3>
-          <span id="senior-specialists-badge" class="px-3 py-1 rounded-full bg-emerald-50 text-emerald-900 font-bold text-xs">0 Connected</span>
-        </div>
-
-        <div id="senior-specialists-container" class="grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
-      </div>
-
     </div>
 
   </main>
@@ -635,65 +626,70 @@
     </div>
   </div>
 
-  <!-- ================================================================= -->
-  <!-- FULLSCREEN VR / 3D SANCTUARY OVERLAY (Phase 1 WebXR)              -->
-  <!-- ================================================================= -->
-  <div id="smriti-vr-overlay" class="fixed inset-0 z-50 hidden bg-[#0F172A] flex flex-col justify-between overflow-hidden">
-    <!-- Top VR Header (Visible in Desktop Preview and initial transition) -->
-    <div id="vr-overlay-header" class="absolute top-0 inset-x-0 z-20 p-4 sm:p-6 flex items-center justify-between bg-gradient-to-b from-black/85 via-black/40 to-transparent pointer-events-none">
-      <div class="flex items-center gap-3 pointer-events-auto">
-        <div class="w-11 h-11 rounded-2xl bg-purple-600 text-white flex items-center justify-center text-2xl shadow-md border border-purple-400/40">
-          🥽
+  <!-- Offline Preparation Modal -->
+  <div id="offline-prep-modal" class="hidden offline-modal-overlay">
+    <div class="offline-modal-card space-y-5" onclick="event.stopPropagation()">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div class="flex items-center gap-2.5">
+          <div class="w-10 h-10 rounded-2xl bg-amber-100 text-amber-900 flex items-center justify-center text-xl font-bold">
+            📥
+          </div>
+          <div>
+            <h3 class="text-base font-extrabold text-[#0F172A]">Prepare Smriti for Offline Use</h3>
+            <p class="text-xs text-slate-500 font-medium">Download activities, routines, and memories to use without internet.</p>
+          </div>
         </div>
-        <div>
-          <h2 id="vr-overlay-title" class="text-white font-extrabold text-base sm:text-lg drop-shadow">Smriti VR Memory Sanctuary</h2>
-          <p id="vr-overlay-subtitle" class="text-amber-200/90 text-xs font-semibold drop-shadow">Personalized Family & Memory Space</p>
+        <button id="close-offline-modal-btn" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center justify-center">✕</button>
+      </div>
+
+      <!-- Live Checklist -->
+      <div class="space-y-2.5 text-xs font-semibold text-slate-700 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+        <div id="prep-step-1" class="flex items-center gap-2 text-slate-500">
+          <span class="prep-icon">⏳</span> <span>Application Shell & Core System</span>
+        </div>
+        <div id="prep-step-2" class="flex items-center gap-2 text-slate-500">
+          <span class="prep-icon">⏳</span> <span>Cognitive Activities & Games</span>
+        </div>
+        <div id="prep-step-3" class="flex items-center gap-2 text-slate-500">
+          <span class="prep-icon">⏳</span> <span>Family Dataset & Memories</span>
+        </div>
+        <div id="prep-step-4" class="flex items-center gap-2 text-slate-500">
+          <span class="prep-icon">⏳</span> <span>Daily Routines & Schedules</span>
+        </div>
+        <div id="prep-step-5" class="flex items-center gap-2 text-slate-500">
+          <span class="prep-icon">⏳</span> <span>Media Photos & Audio Tracks</span>
         </div>
       </div>
 
-      <div class="flex items-center gap-3 pointer-events-auto">
-        <div id="vr-mode-badge" class="px-3 py-1.5 rounded-full bg-purple-950/80 text-purple-200 border border-purple-400/50 text-xs font-bold shadow-sm">
-          WebXR Immersive
+      <!-- Progress Bar -->
+      <div class="space-y-1.5">
+        <div class="flex items-center justify-between text-xs font-bold text-slate-700">
+          <span id="prep-status-label">Ready to prepare</span>
+          <span id="prep-percent-label">0%</span>
         </div>
-        <button id="vr-exit-btn" class="px-4 py-2 rounded-2xl bg-white/95 hover:bg-white text-slate-900 font-extrabold text-xs shadow-lg hover:scale-105 active:scale-95 transition-all flex items-center gap-1.5 border border-slate-300" title="Exit Sanctuary (Esc)">
-          <span>✕</span>
-          <span>Exit Sanctuary</span>
+        <div class="w-full h-3 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
+          <div id="prep-progress-bar" class="h-full bg-amber-500 transition-all duration-300 w-0"></div>
+        </div>
+      </div>
+
+      <!-- Modal Actions -->
+      <div class="flex items-center justify-end gap-3 pt-2">
+        <button id="cancel-prep-btn" class="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold">
+          Close
+        </button>
+        <button id="start-prep-btn" class="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-extrabold shadow-sm transition-all flex items-center gap-2">
+          <span>⚡</span> <span>Start Preparation</span>
         </button>
       </div>
     </div>
+  </div>
 
-    <!-- Isolated Three.js Canvas Container -->
-    <div id="smriti-vr-canvas-container" class="relative w-full h-full flex-grow"></div>
-
-    <!-- Desktop Instructions Footer (Only shown during Desktop Preview) -->
-    <div id="vr-desktop-instructions" class="absolute bottom-4 inset-x-0 z-20 hidden text-center pointer-events-none">
-      <div class="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-black/70 backdrop-blur-md border border-white/20 text-white text-xs font-semibold shadow-xl">
-        <span>🖱️ Click & Drag to Look Around</span>
-        <span>•</span>
-        <span>Hover or Click any Memory, Family Member, Game, or Melody</span>
-        <span>•</span>
-        <span>Press <kbd class="px-1.5 py-0.5 rounded bg-white/20 font-mono text-[10px]">Esc</kbd> to Exit</span>
-      </div>
+  <div id="senior-vr-overlay" class="hidden fixed inset-0 z-[70] bg-slate-950" role="dialog" aria-modal="true" aria-label="3D memory sanctuary">
+    <div class="absolute top-4 left-4 z-10 flex items-center gap-3">
+      <button id="senior-vr-exit-btn" class="touch-target-senior rounded-xl bg-white/95 px-4 py-2 text-sm font-bold text-slate-900 shadow">Exit sanctuary</button>
+      <span id="senior-vr-mode-label" class="rounded-xl bg-slate-900/80 px-3 py-2 text-xs font-bold text-white"></span>
     </div>
-
-    <!-- In-World VR Talk Text Fallback Modal -->
-    <div id="vr-talk-text-dialog" class="absolute bottom-16 inset-x-4 sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 z-30 hidden max-w-lg w-full p-4 rounded-3xl bg-slate-900/95 backdrop-blur-xl border border-rose-400/40 shadow-2xl space-y-3">
-      <div class="flex items-center justify-between pb-2 border-b border-white/10">
-        <div class="flex items-center gap-2 text-rose-300 text-xs font-bold">
-          <span>💬</span>
-          <span>Type to Smriti</span>
-        </div>
-        <button id="vr-talk-text-close-btn" class="text-slate-400 hover:text-white text-xs font-bold px-2.5 py-1 rounded-lg hover:bg-white/10" title="Close">
-          ✕
-        </button>
-      </div>
-      <div class="flex items-center gap-2">
-        <input type="text" id="vr-talk-text-input" placeholder="Type what is on your heart..." class="flex-grow px-4 py-3 rounded-2xl bg-black/50 border border-white/20 text-white placeholder-slate-400 text-sm font-medium focus:outline-none focus:border-rose-400" />
-        <button id="vr-talk-text-submit-btn" class="px-5 py-3 rounded-2xl bg-rose-600 hover:bg-rose-500 active:scale-95 text-white text-xs font-extrabold shadow-lg transition-all">
-          SEND
-        </button>
-      </div>
-    </div>
+    <div id="senior-vr-container" class="h-full w-full"></div>
   </div>
 
   <!-- Toast Notification Container -->
@@ -703,7 +699,6 @@
   <script src="/src/services/api-client.js"></script>
   <script src="/src/services/firebase-client.js"></script>
   <script src="/src/services/relationship-client.js"></script>
-  <script src="/src/services/specialist-client.js"></script>
   <script src="/src/services/media-client.js"></script>
   <script src="/src/services/profile-client.js"></script>
   <script src="/src/components/audio.js"></script>
@@ -714,164 +709,38 @@
     import { voiceService } from '/src/services/voice-service.js';
     import { offlineSyncService } from '/src/services/offline-sync-service.js';
     import { cognitiveClient } from '/src/services/cognitive-client.js';
-    import { smritiVREngine, SmritiVREngine } from '/src/components/vr/vr-engine.js';
-
-    let expData = null;
-    let globalCurrentPack = null;
-    let globalElderlyUserId = null;
-
-    // Immediately run capability check and bind VR controls without blocking on backend data
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', () => {
-        initVREntrypoint().catch(e => console.warn('[VR] Init error:', e));
-      });
-    } else {
-      initVREntrypoint().catch(e => console.warn('[VR] Init error:', e));
-    }
-
-    // 3b. VR / 3D Sanctuary Capability Detection & Setup (Phase 1 WebXR)
-    async function initVREntrypoint() {
-      const vrBtn = document.getElementById('senior-enter-vr-btn');
-      const vrLabel = document.getElementById('senior-vr-btn-label');
-      if (!vrBtn || !vrLabel) return;
-
-      let isVRSupported = false;
-      try {
-        isVRSupported = await SmritiVREngine.isWebXRImmersiveSupported();
-      } catch (e) {
-        isVRSupported = false;
-      }
-
-      const isDesktop = !/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
-      let launchMode = null;
-
-      if (isVRSupported) {
-        launchMode = 'vr';
-        vrLabel.textContent = 'ENTER VR';
-        vrBtn.classList.remove('hidden');
-        vrBtn.classList.add('inline-flex');
-      } else if (isDesktop) {
-        launchMode = 'desktop';
-        vrLabel.textContent = 'Explore 3D Sanctuary — Desktop Preview';
-        vrBtn.classList.remove('hidden');
-        vrBtn.classList.add('inline-flex');
-      } else {
-        // Mobile without WebXR keeps normal Senior Space completely unchanged
-        vrBtn.classList.add('hidden');
-        vrBtn.classList.remove('inline-flex', 'sm:inline-flex');
-        return;
-      }
-
-      const vrOverlay = document.getElementById('smriti-vr-overlay');
-      const vrCanvasContainer = document.getElementById('smriti-vr-canvas-container');
-      const vrExitBtn = document.getElementById('vr-exit-btn');
-      const vrModeBadge = document.getElementById('vr-mode-badge');
-      const vrDesktopInstructions = document.getElementById('vr-desktop-instructions');
-
-      const closeVR = () => {
-        smritiVREngine.exit();
-        if (vrOverlay) vrOverlay.classList.add('hidden');
-        document.body.classList.remove('overflow-hidden');
-      };
-
-      if (vrExitBtn && !vrExitBtn.dataset.bound) {
-        vrExitBtn.dataset.bound = 'true';
-        vrExitBtn.addEventListener('click', closeVR);
-      }
-
-      if (!vrBtn.dataset.bound) {
-        vrBtn.dataset.bound = 'true';
-        vrBtn.addEventListener('click', async () => {
-          if (vrOverlay) vrOverlay.classList.remove('hidden');
-          document.body.classList.add('overflow-hidden');
-
-          if (vrModeBadge) {
-            vrModeBadge.textContent = launchMode === 'vr' ? '🥽 WebXR Immersive' : '🖥️ Desktop 3D Preview';
-          }
-          if (vrDesktopInstructions) {
-            if (launchMode === 'desktop') {
-              vrDesktopInstructions.classList.remove('hidden');
-            } else {
-              vrDesktopInstructions.classList.add('hidden');
-            }
-          }
-
-          const sessionToken = window.ApiClient ? window.ApiClient.getToken() : '';
-          const activeExpData = expData || {
-            displayName: (window.smritiAuth?.getUser()?.name) || 'Elder',
-            greeting: 'Welcome to your 3D Sanctuary',
-            profile: { preferredLanguage: 'as' },
-            memories: { photos: [], audios: [] },
-            family: [],
-            routines: []
-          };
-          const lang = activeExpData?.profile?.preferredLanguage || 'as';
-
-          await smritiVREngine.start({
-            containerEl: vrCanvasContainer,
-            expData: activeExpData,
-            sessionToken,
-            mode: launchMode,
-            currentPack: globalCurrentPack,
-            elderlyUserId: globalElderlyUserId || (window.smritiAuth?.getUser()?.id) || 'elderly_user',
-            cognitiveClient,
-            onRecordSession: async (sessionPayload) => {
-              try {
-                return await cognitiveClient.recordSession(sessionPayload);
-              } catch (e) {
-                console.warn('[VR] recordSession fallback:', e);
-              }
-            },
-            onExit: () => {
-              if (vrOverlay) vrOverlay.classList.add('hidden');
-              document.body.classList.remove('overflow-hidden');
-            },
-            onSpeak: (text, speechLang) => {
-              if (voiceService && voiceService.speak) {
-                voiceService.speak(text, speechLang || lang);
-              }
-            },
-            voiceService
-          });
-        });
-      }
-    }
+    import { offlineDb } from '/src/services/offline-db.js';
+    import { offlinePrepService } from '/src/services/offline-prep-service.js';
+    import { registerServiceWorker } from '/src/services/sw-register.js';
+    import { smritiVREngine } from '/src/components/vr/vr-engine.js';
 
     document.addEventListener('DOMContentLoaded', async () => {
+      // 0. Register root Service Worker for offline shell and CDN caching
+      await registerServiceWorker();
+
       // Initialize audio engine
       window.smritiAudio = new SmritiAudio();
 
-      // 1. Enforce Elderly RBAC Session
-      let token = window.ApiClient?.getToken() || localStorage.getItem('smriti_session_token');
+      // 1. Enforce Elderly RBAC Session (resilient to offline state)
       let user = window.smritiAuth?.getUser();
-
-      const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-      if ((!token || !user || user.role !== 'elderly_user') && isLocalDev && window.ApiClient) {
+      if (!user) {
         try {
-          const devAuth = await window.ApiClient.loginWithGoogle({
-            oauthUser: {
-              id: 'elderly_dev_senior',
-              name: 'Sruti Baba',
-              email: 'sruti.dev@example.com'
-            },
-            intendedRole: 'elderly_user'
-          });
-          if (devAuth?.user && devAuth?.sessionToken) {
-            user = devAuth.user;
-            token = devAuth.sessionToken;
-          }
-        } catch (devErr) {
-          console.warn('[SeniorSpace] Dev session restore error:', devErr);
-        }
+          const raw = localStorage.getItem('smriti_auth_user');
+          if (raw) user = JSON.parse(raw);
+        } catch (e) {}
       }
 
-      if (!token || !user || user.role !== 'elderly_user') {
-        window.location.href = '/auth?role=elderly_user';
+      if (!user || user.role !== 'elderly_user') {
+        if (navigator.onLine) {
+          window.location.href = '/auth?role=elderly_user';
+          return;
+        }
+        window.location.replace('/auth?role=elderly_user');
         return;
       }
 
       const elderlyUserId = user.id;
-      globalElderlyUserId = elderlyUserId;
+      let expData = null;
       let currentPack = null;
       let activeGameList = [];
       let currentActivityIndex = 0;
@@ -880,27 +749,124 @@
       let currentAttempts = 0;
       let sessionAnswers = [];
 
-      // 2. Setup Offline Sync Indicator
+      const vrOverlay = document.getElementById('senior-vr-overlay');
+      const vrContainer = document.getElementById('senior-vr-container');
+      const closeVr = () => {
+        if (smritiVREngine.isSessionActive) smritiVREngine.exit();
+        vrOverlay?.classList.add('hidden');
+      };
+      document.getElementById('senior-vr-exit-btn')?.addEventListener('click', closeVr);
+      document.getElementById('senior-vr-launch-btn')?.addEventListener('click', async () => {
+        const mode = 'vr';
+        const modeLabel = document.getElementById('senior-vr-mode-label');
+        if (modeLabel) modeLabel.textContent = 'Entering VR or 3D preview…';
+        vrOverlay?.classList.remove('hidden');
+        await smritiVREngine.start({
+          containerEl: vrContainer,
+          expData: expData || {},
+          sessionToken: localStorage.getItem('smriti_session_token') || sessionStorage.getItem('smriti_session_token') || '',
+          mode,
+          elderlyUserId,
+          currentPack,
+          cognitiveClient,
+          voiceService,
+          onSpeak: (text, language) => voiceService.speak(text, language),
+          onRecordSession: (session) => cognitiveClient.recordSession(session),
+          onExit: () => vrOverlay?.classList.add('hidden')
+        });
+      });
+
+      // 2. Setup Real-time Connectivity Indicator
       const offlinePill = document.getElementById('senior-offline-pill');
       const offlineText = document.getElementById('senior-offline-text');
+      const offlineDot = document.getElementById('senior-offline-dot');
 
       offlineSyncService.onStatusChange(({ isOnline, status, message }) => {
-        if (!isOnline || status === 'offline' || status === 'queued') {
-          offlinePill.classList.remove('hidden');
-          offlineText.textContent = message || 'Offline mode — activities ready';
-        } else if (status === 'synced' || status === 'online') {
-          offlinePill.classList.remove('hidden');
-          offlineText.textContent = 'Everything is up to date.';
+        if (!offlinePill) return;
+        offlinePill.className = 'px-3.5 py-1.5 rounded-full border text-xs font-bold flex items-center gap-2 shadow-xs transition-all';
+
+        if (status === 'online') {
+          offlinePill.classList.add('offline-status-online');
+          if (offlineDot) offlineDot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-500';
+          offlineText.textContent = '🟢 Online';
+        } else if (status === 'degraded') {
+          offlinePill.classList.add('offline-status-degraded');
+          if (offlineDot) offlineDot.className = 'w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse';
+          offlineText.textContent = '🟡 Weak connection — using saved activities';
+        } else if (status === 'offline') {
+          offlinePill.classList.add('offline-status-offline');
+          if (offlineDot) offlineDot.className = 'w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse';
+          offlineText.textContent = '🔴 Offline — using saved activities';
+        } else if (status === 'syncing') {
+          offlinePill.classList.add('offline-status-syncing');
+          if (offlineDot) offlineDot.className = 'w-2.5 h-2.5 rounded-full bg-blue-500 animate-spin';
+          offlineText.textContent = message || '🔄 Syncing saved sessions...';
+        } else if (status === 'synced') {
+          offlinePill.classList.add('offline-status-online');
+          if (offlineDot) offlineDot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-500';
+          offlineText.textContent = '✓ Progress synchronized';
           setTimeout(() => {
-            if (navigator.onLine) offlinePill.classList.add('hidden');
-          }, 3000);
+            if (offlineSyncService.isOnline) {
+              offlineText.textContent = '🟢 Online';
+            }
+          }, 3500);
         }
       });
 
-      if (!navigator.onLine) {
-        offlinePill.classList.remove('hidden');
-        offlineText.textContent = 'Offline mode — your activities are still available.';
-      }
+      // 2b. Setup Prepare for Offline Use Modal & Handler
+      const prepModal = document.getElementById('offline-prep-modal');
+      const openPrepBtn = document.getElementById('senior-prepare-offline-btn');
+      const closePrepBtn = document.getElementById('close-offline-modal-btn');
+      const cancelPrepBtn = document.getElementById('cancel-prep-btn');
+      const startPrepBtn = document.getElementById('start-prep-btn');
+      const prepStatusLabel = document.getElementById('prep-status-label');
+      const prepPercentLabel = document.getElementById('prep-percent-label');
+      const prepProgressBar = document.getElementById('prep-progress-bar');
+
+      const openPrepModal = () => prepModal?.classList.remove('hidden');
+      const closePrepModal = () => prepModal?.classList.add('hidden');
+
+      openPrepBtn?.addEventListener('click', openPrepModal);
+      closePrepBtn?.addEventListener('click', closePrepModal);
+      cancelPrepBtn?.addEventListener('click', closePrepModal);
+
+      startPrepBtn?.addEventListener('click', async () => {
+        startPrepBtn.disabled = true;
+        startPrepBtn.innerHTML = '<span>⏳</span> <span>Preparing...</span>';
+        if (prepStatusLabel) prepStatusLabel.textContent = 'Starting preparation...';
+
+        try {
+          await offlinePrepService.prepareForOfflineUse(elderlyUserId, ({ step, label, percent, done }) => {
+            if (prepStatusLabel) prepStatusLabel.textContent = label;
+            if (prepPercentLabel) prepPercentLabel.textContent = `${percent}%`;
+            if (prepProgressBar) prepProgressBar.style.width = `${percent}%`;
+
+            if (step >= 1) {
+              const el = document.getElementById(`prep-step-${step}`);
+              if (el) {
+                el.classList.remove('text-slate-500');
+                el.classList.add('text-emerald-700', 'font-bold');
+                const icon = el.querySelector('.prep-icon');
+                if (icon) icon.textContent = '✓';
+              }
+            }
+
+            if (done) {
+              startPrepBtn.disabled = false;
+              startPrepBtn.innerHTML = '<span>✓</span> <span>Smriti Ready Offline!</span>';
+              startPrepBtn.classList.remove('bg-amber-600', 'hover:bg-amber-700');
+              startPrepBtn.classList.add('bg-emerald-600', 'hover:bg-emerald-700');
+              setTimeout(() => {
+                closePrepModal();
+              }, 2200);
+            }
+          });
+        } catch (prepErr) {
+          startPrepBtn.disabled = false;
+          startPrepBtn.innerHTML = '<span>⚡</span> <span>Retry Preparation</span>';
+          if (prepStatusLabel) prepStatusLabel.textContent = `Preparation paused: ${prepErr.message}`;
+        }
+      });
 
       // 3. Load Personalized Experience
       try {
@@ -954,7 +920,6 @@
         try {
           const lang = expData?.profile?.preferredLanguage || 'as';
           currentPack = await cognitiveClient.fetchActivityPack(elderlyUserId, { language: lang });
-          globalCurrentPack = currentPack;
 
           if (currentPack && currentPack.activities && currentPack.activities.length > 0) {
             document.getElementById('game-difficulty-badge').textContent = `Level ${currentPack.difficulty || 1} (${currentPack.difficulty > 2 ? 'Active' : 'Gentle'})`;
@@ -1017,7 +982,28 @@
         }
 
         if (!currentPack || !currentPack.activities || currentPack.activities.length === 0) {
-          console.warn('No activities available.');
+          // Check IndexedDB individual activities or cached pack
+          const cachedPack = await offlineSyncService.getCachedActivityPack(elderlyUserId);
+          if (cachedPack?.activities?.length > 0) {
+            currentPack = cachedPack;
+          } else {
+            const allLocal = await offlineDb.getAll('activities');
+            if (allLocal && allLocal.length > 0) {
+              currentPack = { activities: allLocal.filter(activity => activity.elderlyUserId === elderlyUserId) };
+            }
+          }
+        }
+
+        if (!currentPack || !currentPack.activities || currentPack.activities.length === 0) {
+          console.warn('No activities available offline yet.');
+          const toast = document.getElementById('toast-container');
+          if (toast) {
+            const el = document.createElement('div');
+            el.className = 'p-4 rounded-2xl bg-amber-600 text-white font-bold text-xs shadow-lg flex items-center gap-2';
+            el.innerHTML = '<span>📥</span> <span>This activity is not ready offline yet. Tap "Prepare Offline" at the top to download it.</span>';
+            toast.appendChild(el);
+            setTimeout(() => el.remove(), 4000);
+          }
           return;
         }
 
@@ -1509,22 +1495,7 @@
         talkConversationHistory.push({ role: 'user', content: cleanText });
 
         const statusEl = document.getElementById('talk-live-transcript');
-        const micBtn = document.getElementById('talk-mic-toggle-btn');
-        const micIcon = document.getElementById('talk-mic-icon');
-        const micLabel = document.getElementById('talk-mic-label');
-
-        function setReadyState() {
-          if (micBtn) {
-            micBtn.classList.remove('bg-red-600', 'animate-pulse');
-            micBtn.classList.add('bg-rose-600');
-          }
-          if (micIcon) micIcon.textContent = '🎤';
-          if (micLabel) micLabel.textContent = 'Start Talking';
-          if (statusEl) statusEl.textContent = 'Tap "Start Talking" or choose a reply below...';
-        }
-
-        // State: THINKING
-        if (statusEl) statusEl.textContent = '💭 Smriti is thinking...';
+        if (statusEl) statusEl.textContent = 'Smriti is listening and reflecting...';
 
         try {
           const res = await window.CognitiveClient.sendConversationMessage({
@@ -1538,38 +1509,27 @@
             talkConversationHistory.push({ role: 'assistant', content: res.replyText });
             appendChatMessage('assistant', res.replyText, currentTalkLang);
             
-            // State: SPEAKING
-            if (statusEl) statusEl.textContent = '🔊 Smriti is speaking...';
-            window.VoiceService.speak(res.replyText, currentTalkLang, {
-              onEnd: () => {
-                setReadyState();
-              }
-            });
+            // Speak response with natural elderly cadence
+            window.VoiceService.speak(res.replyText, currentTalkLang);
 
             if (res.suggestedReplies) {
               renderSuggestedChips(res.suggestedReplies);
             }
-          } else {
-            setReadyState();
+          }
+
+          if (res?.isOfflineFallback) {
+            if (statusEl) statusEl.textContent = 'Offline Reminiscence Mode — session saved locally.';
+          } else if (statusEl) {
+            statusEl.textContent = 'Tap "Start Talking" or choose a reply below...';
           }
         } catch (err) {
-          console.warn('Conversation message error:', err);
-          const errNotice = 'Smriti is having trouble connecting right now. Please try again.';
-          appendChatMessage('assistant', errNotice, currentTalkLang);
+          console.warn('Conversation message notice:', err);
+          const errNotice = 'Tap "Start Talking" to speak or type a response below.';
           if (statusEl) statusEl.textContent = errNotice;
-          window.VoiceService.speak(errNotice, currentTalkLang, {
-            onEnd: () => {
-              setReadyState();
-            }
-          });
-          setReadyState();
         }
       }
 
-      let openingPromptSpoken = false;
-      let cachedOpeningPrompt = null;
-
-      async function initTalkAndRecallSession(exp, shouldSpeak = false) {
+      async function initTalkAndRecallSession(exp) {
         talkConversationHistory = [];
         currentTalkLang = exp?.profile?.preferredLanguage || 'as';
 
@@ -1582,27 +1542,25 @@
         try {
           const data = await window.CognitiveClient.fetchConversationPrompt(elderlyUserId, currentTalkLang);
           if (data?.promptText) {
-            cachedOpeningPrompt = data.promptText;
             talkConversationHistory.push({ role: 'assistant', content: data.promptText });
             appendChatMessage('assistant', data.promptText, currentTalkLang);
             
-            // Respect browser autoplay policy: only speak if explicitly requested via genuine user interaction
-            if (shouldSpeak && !openingPromptSpoken) {
-              openingPromptSpoken = true;
-              window.VoiceService.speak(data.promptText, currentTalkLang);
-            }
+            // Speak opening prompt
+            window.VoiceService.speak(data.promptText, currentTalkLang);
 
             if (data.suggestedReplies) {
               renderSuggestedChips(data.suggestedReplies);
             }
           }
 
-          if (statusEl) {
+          if (data?.isOfflineFallback) {
+            if (statusEl) statusEl.textContent = 'Offline Reminiscence Mode — using your saved memories.';
+          } else if (statusEl) {
             statusEl.textContent = 'Tap "Start Talking" to share your memories...';
           }
         } catch (e) {
           console.warn('Failed to load opening prompt:', e);
-          const fallback = 'Smriti is having trouble connecting right now. Please try again.';
+          const fallback = 'Tap "Start Talking" or type below to reminisce.';
           appendChatMessage('assistant', fallback, currentTalkLang);
           if (statusEl) statusEl.textContent = fallback;
         }
@@ -1611,13 +1569,12 @@
       function setupTalkAndRecall(exp) {
         currentTalkLang = exp?.profile?.preferredLanguage || 'as';
 
-        // Initialize opening prompt without unprompted auto-speech to satisfy browser autoplay policy
-        initTalkAndRecallSession(exp, false);
+        // Immediately initialize opening prompt
+        initTalkAndRecallSession(exp);
 
-        // Restart conversation button (genuine user click -> can speak)
+        // Restart conversation button
         document.getElementById('talk-restart-btn')?.addEventListener('click', () => {
-          openingPromptSpoken = false;
-          initTalkAndRecallSession(exp, true);
+          initTalkAndRecallSession(exp);
         });
 
         // Microphone toggle
@@ -1627,8 +1584,8 @@
         const statusEl = document.getElementById('talk-live-transcript');
         const textInput = document.getElementById('talk-text-input');
 
-        // Check if Web Speech API is supported (using actual property isRecognitionSupported)
-        if (!window.VoiceService.isRecognitionSupported && statusEl) {
+        // Check if Web Speech API is supported
+        if (!window.VoiceService.isSpeechRecognitionSupported && statusEl) {
           statusEl.textContent = 'Voice recognition is not supported in this browser. You can type below.';
         }
 
@@ -1666,22 +1623,11 @@
                 micIcon.textContent = '🎤';
                 micLabel.textContent = 'Start Talking';
                 
-                const errorCode = err?.error || err?.message || (typeof err === 'string' ? err : '');
-
-                if (errorCode === 'not-allowed' || errorCode === 'service-not-allowed' || errorCode.includes('not-allowed')) {
-                  if (statusEl) statusEl.textContent = 'Microphone access is needed for voice conversation. Please allow microphone access or type below.';
+                if (err === 'not-allowed' || err === 'service-not-allowed' || err?.includes?.('not-allowed')) {
+                  if (statusEl) statusEl.textContent = 'Microphone access is needed for voice conversation. You can continue by typing.';
                   if (textInput) textInput.focus();
-                } else if (errorCode === 'no-speech') {
-                  if (statusEl) statusEl.textContent = 'No speech was heard. Tap "Start Talking" to try again, or type below.';
-                } else if (errorCode === 'audio-capture') {
-                  if (statusEl) statusEl.textContent = 'No microphone was detected on your device. You can type below.';
-                  if (textInput) textInput.focus();
-                } else if (errorCode === 'network') {
-                  if (statusEl) statusEl.textContent = 'Network issue with voice recognition. You can continue by typing below.';
-                } else if (errorCode === 'aborted') {
-                  if (statusEl) statusEl.textContent = 'Listening stopped.';
                 } else {
-                  if (statusEl) statusEl.textContent = 'Could not hear clearly. Please tap "Start Talking" to try again or type below.';
+                  if (statusEl) statusEl.textContent = 'Could not hear clearly. Please tap to try again or type below.';
                 }
               },
               onEnd: () => {
@@ -1713,65 +1659,30 @@
           }
         });
 
-        // Re-initialize or speak when user navigates into Talk & Recall section
+        // Re-initialize or scroll when user navigates into Talk & Recall section
         document.querySelectorAll('.senior-tile-btn[data-view="section-talk"]').forEach(tile => {
           tile.addEventListener('click', () => {
-            if (cachedOpeningPrompt && !openingPromptSpoken && talkConversationHistory.length <= 1) {
-              openingPromptSpoken = true;
-              window.VoiceService.speak(cachedOpeningPrompt, currentTalkLang);
-            } else if (talkConversationHistory.length === 0) {
-              initTalkAndRecallSession(exp, true);
+            if (talkConversationHistory.length === 0) {
+              initTalkAndRecallSession(exp);
             }
           });
         });
       }
 
-      // 11. Caretaker & Clinical Specialist Connection Requests
+      // 11. Caretaker Connection Requests
       async function loadCaretakerConnections() {
         try {
           const rels = await window.RelationshipClient.getElderlyRelationships();
           const pending = rels.filter(r => r.status === 'pending');
           const accepted = rels.filter(r => r.status === 'accepted');
 
-          // Fetch incoming specialist requests
-          let specPending = [];
-          try {
-            if (window.SpecialistClient) {
-              const specRels = await window.SpecialistClient.getPendingRequests();
-              specPending = specRels.filter(r => r.status === 'pending');
-            }
-          } catch (err) {}
-
           document.getElementById('senior-caretakers-badge').textContent = `${accepted.length} Connected`;
 
           const pCont = document.getElementById('senior-pending-requests-container');
-          if (pending.length > 0 || specPending.length > 0) {
+          if (pending.length > 0) {
             pCont.innerHTML = `
-              <div class="p-4 rounded-2xl bg-amber-50 border-2 border-amber-300 space-y-3 shadow-xs">
-                <div class="text-xs font-extrabold text-amber-950 flex items-center gap-2">
-                  <span>🩺</span> <span>Pending Clinical & Family Connection Requests</span>
-                </div>
-                ${specPending.map(sp => `
-                  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 bg-white rounded-xl border border-amber-300 shadow-xs">
-                    <div class="flex items-center gap-2.5">
-                      <div class="w-8 h-8 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center font-bold text-sm">
-                        🩺
-                      </div>
-                      <div>
-                        <div class="font-extrabold text-xs text-[#0F172A]">Dr. ${sp.specialistName || 'Specialist'}</div>
-                        <div class="text-[10px] text-slate-500 font-medium">${sp.specialistSpecialization || 'Geriatric Specialist'} • ${sp.specialistEmail || 'Clinical Clinician'}</div>
-                      </div>
-                    </div>
-                    <div class="flex items-center gap-2">
-                      <button class="accept-spec-btn px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold shadow-xs transition-all flex items-center gap-1" data-id="${sp.id || sp.relationshipId}">
-                        <span>✓</span> <span>Approve / Accept</span>
-                      </button>
-                      <button class="reject-spec-btn px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-all" data-id="${sp.id || sp.relationshipId}">
-                        Decline
-                      </button>
-                    </div>
-                  </div>
-                `).join('')}
+              <div class="p-4 rounded-2xl bg-amber-50 border border-amber-200 space-y-3">
+                <div class="text-xs font-bold text-amber-900">Pending Connection Invitations</div>
                 ${pending.map(p => `
                   <div class="flex items-center justify-between gap-3 p-3 bg-white rounded-xl border border-amber-200">
                     <div class="flex items-center gap-2 text-xs font-bold text-slate-800">
@@ -1785,31 +1696,6 @@
                 `).join('')}
               </div>
             `;
-
-            pCont.querySelectorAll('.accept-spec-btn').forEach(b => {
-              b.addEventListener('click', async () => {
-                b.disabled = true;
-                b.textContent = 'Accepting...';
-                await window.ApiClient.request(`/api/specialist/link/${b.dataset.id}/respond`, {
-                  method: 'PUT',
-                  body: JSON.stringify({ status: 'accepted', decision: 'accepted' })
-                });
-                await loadCaretakerConnections();
-                await loadSeniorSpecialists();
-              });
-            });
-
-            pCont.querySelectorAll('.reject-spec-btn').forEach(b => {
-              b.addEventListener('click', async () => {
-                b.disabled = true;
-                await window.ApiClient.request(`/api/specialist/link/${b.dataset.id}/respond`, {
-                  method: 'PUT',
-                  body: JSON.stringify({ status: 'rejected', decision: 'rejected' })
-                });
-                await loadCaretakerConnections();
-                await loadSeniorSpecialists();
-              });
-            });
 
             pCont.querySelectorAll('.accept-rel-btn').forEach(b => {
               b.addEventListener('click', async () => {
@@ -1847,64 +1733,6 @@
         }
       }
 
-      // 11b. Load Connected Medical Specialists
-      async function loadSeniorSpecialists() {
-        try {
-          if (!window.SpecialistClient) return;
-          const specs = await window.SpecialistClient.getPatientSpecialists(elderlyUserId);
-          const acceptedSpecs = (specs || []).filter(s => s.status === 'accepted');
-
-          const badge = document.getElementById('senior-specialists-badge');
-          if (badge) badge.textContent = `${acceptedSpecs.length} Connected`;
-
-          const sCont = document.getElementById('senior-specialists-container');
-          if (!sCont) return;
-
-          if (acceptedSpecs.length > 0) {
-            sCont.innerHTML = acceptedSpecs.map(s => {
-              const specTitle = s.specialistName ? (s.specialistName.startsWith('Dr.') ? s.specialistName : `Dr. ${s.specialistName}`) : 'Medical Specialist';
-              const specRole = s.specialistSpecialization || s.specialization || 'Geriatric Specialist';
-              const specClinic = s.hospitalClinic || s.clinic || 'Clinical Care Network';
-              const cueText = `${specTitle}, your authorized ${specRole}.`;
-
-              return `
-                <div class="p-4 rounded-3xl bg-emerald-50/40 border-2 border-emerald-100 flex items-center justify-between gap-3 shadow-sm hover:border-emerald-300 transition-all">
-                  <div class="flex items-center gap-3">
-                    <div class="w-14 h-14 rounded-2xl bg-white border border-emerald-200 text-emerald-900 flex items-center justify-center text-2xl font-bold shadow-xs flex-shrink-0">
-                      🩺
-                    </div>
-                    <div>
-                      <div class="font-extrabold text-base text-[#0F172A] flex items-center gap-1.5">
-                        <span>${specTitle}</span>
-                        <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold uppercase">Authorized</span>
-                      </div>
-                      <div class="text-xs font-extrabold text-emerald-800 flex items-center gap-1.5 mt-0.5">
-                        <span>${specRole}</span>
-                      </div>
-                      <div class="text-xs text-slate-500 font-medium mt-0.5">📍 ${specClinic}</div>
-                    </div>
-                  </div>
-                  <button class="voice-cue-btn p-3 rounded-2xl bg-white border-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50 active:scale-95 text-base font-bold shadow-xs transition-all flex-shrink-0" data-text="${cueText}" title="Listen to Introduction">
-                    🔊
-                  </button>
-                </div>
-              `;
-            }).join('');
-
-            sCont.querySelectorAll('.voice-cue-btn').forEach(b => {
-              b.addEventListener('click', () => {
-                const lang = expData?.profile?.preferredLanguage || 'as';
-                window.VoiceService.speak(b.dataset.text, lang);
-              });
-            });
-          } else {
-            sCont.innerHTML = '<p class="text-xs text-slate-400 p-2 col-span-full">No medical specialists connected yet.</p>';
-          }
-        } catch (e) {
-          console.error('Failed to load senior medical specialists:', e);
-        }
-      }
-
       // 12. Accessibility Toggles
       document.getElementById('senior-contrast-toggle').addEventListener('click', () => {
         document.body.classList.toggle('high-contrast-mode');
@@ -1929,7 +1757,6 @@
       });
 
       await loadCaretakerConnections();
-      await loadSeniorSpecialists();
     });
   </script>
 </body>

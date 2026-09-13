@@ -6,6 +6,7 @@
   <title>Caretaker Studio | Smriti Memory Platform</title>
   <meta name="description" content="Personalization Studio for Family Caregivers & Healthcare Workers." />
   <meta name="theme-color" content="#0F172A" />
+  <link rel="manifest" href="/manifest.json" />
 
   <!-- Google Fonts: Plus Jakarta Sans & Lora -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -1709,8 +1710,14 @@
   <!-- Studio App Script -->
   <script type="module">
     import { cognitiveClient } from '/src/services/cognitive-client.js';
+    import { registerServiceWorker } from '/src/services/sw-register.js';
+    import { offlineDb } from '/src/services/offline-db.js';
+    import { offlinePrepService } from '/src/services/offline-prep-service.js';
 
     document.addEventListener('DOMContentLoaded', async () => {
+      // 0. Register Service Worker
+      await registerServiceWorker();
+
       // 1. Enforce Caretaker RBAC Session
       const user = window.smritiAuth?.getUser();
       if (!user || user.role !== 'caretaker') {
