@@ -9,7 +9,8 @@ import { activityGeneratorService } from '../services/activity-generator.service
 import { performanceService } from '../services/performance.service.js';
 import { adaptiveEngineService } from '../services/adaptive-engine.service.js';
 import { conversationReminiscenceService } from '../services/conversation-reminiscence.service.js';
-import { requireAuth } from '../middleware/auth-middleware.js';
+import { openaiTtsService } from '../services/openai-tts.service.js';
+import { requireAuth, optionalAuth } from '../middleware/auth-middleware.js';
 import { requireActiveRelationship } from '../middleware/relationship-middleware.js';
 import { logger } from '../utils/logger.js';
 
@@ -57,6 +58,38 @@ router.post('/conversation/message', requireAuth, async (req, res) => {
       success: false,
       error: userSafeMessage,
       userFriendlyMessage: userSafeMessage
+    });
+  }
+});
+
+/**
+ * 0c. POST /api/cognitive/conversation/tts
+ * Synthesizes neural speech using server-side OpenAI TTS
+ */
+router.post('/conversation/tts', optionalAuth, async (req, res) => {
+  try {
+    const { text, language } = req.body;
+    if (!text || typeof text !== 'string' || !text.trim()) {
+      return res.status(400).json({ success: false, error: 'text is required' });
+    }
+
+    const { audioBuffer, mimeType, modelUsed, voiceUsed } = await openaiTtsService.synthesizeSpeech({
+      text,
+      language
+    });
+
+    res.setHeader('Content-Type', mimeType || 'audio/mpeg');
+    res.setHeader('Content-Length', audioBuffer.length);
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('X-TTS-Model', modelUsed);
+    res.setHeader('X-TTS-Voice', voiceUsed);
+    return res.status(200).send(audioBuffer);
+  } catch (err) {
+    logger.error('Error synthesizing speech via OpenAI TTS', { message: err?.message });
+    return res.status(503).json({
+      success: false,
+      error: 'OpenAI TTS service unavailable',
+      message: err?.message || 'Failed to synthesize speech'
     });
   }
 });

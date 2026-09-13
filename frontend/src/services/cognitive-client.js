@@ -12,7 +12,9 @@ class CognitiveClient {
   }
 
   getAuthHeader() {
-    const token = localStorage.getItem('smriti_session_token') || sessionStorage.getItem('smriti_session_token');
+    const token = localStorage.getItem('smriti_session_token') ||
+      sessionStorage.getItem('smriti_session_token') ||
+      (typeof window !== 'undefined' && window.ApiClient?.getToken ? window.ApiClient.getToken() : null);
     return token ? { 'Authorization': `Bearer ${token}` } : {};
   }
 
@@ -145,6 +147,34 @@ class CognitiveClient {
     });
     if (!res.ok) throw new Error(`HTTP error ${res.status}`);
     return await res.json();
+  }
+
+  /**
+   * Synthesizes neural speech using server-side OpenAI TTS
+   * @param {string} text - Response text to speak aloud
+   * @param {string} [language='as'] - Language code
+   * @returns {Promise<Blob>} Playable audio blob
+   */
+  async synthesizeSpeech(text, language = 'as') {
+    const res = await fetch(`${this.apiBase}/conversation/tts`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...this.getAuthHeader()
+      },
+      body: JSON.stringify({ text, language })
+    });
+    if (!res.ok) {
+      let errMsg = `TTS service returned HTTP ${res.status}`;
+      try {
+        const errJson = await res.json();
+        if (errJson?.message || errJson?.error) {
+          errMsg = errJson.message || errJson.error;
+        }
+      } catch (e) {}
+      throw new Error(errMsg);
+    }
+    return await res.blob();
   }
 }
 

@@ -30,14 +30,16 @@ function getGeminiClient() {
 }
 
 const CANDIDATE_MODELS = [
+  'gemini-3.5-flash-lite',
+  'gemini-3.1-flash-lite',
+  'gemini-flash-lite-latest',
   process.env.GEMINI_MODEL,
   config.gemini?.model,
-  'gemini-3-flash-preview',
-  'gemini-3.5-flash',
-  'gemini-3.1-flash-lite-preview',
-  'gemini-3.6-flash',
+  'gemini-3.7-flash',
   'gemini-3.8-flash',
-  'gemini-flash-lite-latest'
+  'gemini-3.6-flash',
+  'gemini-3.5-flash',
+  'gemini-3-flash-preview'
 ].filter((m, idx, arr) => m && typeof m === 'string' && arr.indexOf(m) === idx);
 
 /**
@@ -123,15 +125,15 @@ VERIFIED BACKGROUND RECORDS FOR ${seniorName}:
 - Stored Memory Photos: ${JSON.stringify(cleanMemories)}
 
 CORE CONVERSATIONAL BEHAVIORS:
-1. Warmth & Pace: Speak like a caring, patient human companion, NOT a generic AI chatbot. Never say "How can I help you today?", "As an AI...", or give clinical advice.
-2. Simplicity: Use short, simple, comforting sentences (2 to 3 sentences maximum). Avoid big words, long paragraphs, complex grammar, or bulleted lists.
-3. Reminiscence: Ask at most ONE meaningful, open-ended follow-up question per turn to gently encourage the senior to share their memories.
-4. Active Continuity: Maintain conversational continuity. Always connect your response to what the senior just said and remember context from previous turns (e.g. references like "there", "with him", "that place", "the food").
-5. Strict Grounding: NEVER invent family members, trips, or memories that are not in the verified records. If the senior mentions an event or person not in the records (such as a trip to Puri or an old friend), acknowledge it warmly and ask them to share more about it. Never claim you remember an unrecorded event.
+1. Warmth & Pace: Speak like a caring, patient human companion, NOT a generic AI chatbot. Never say "How can I assist you today?", "How can I help you?", "As an AI...", or give clinical advice.
+2. Simplicity & Length: Voice responses MUST be 1 to 3 short, warm sentences. Never speak in long paragraphs or essays. Avoid complex vocabulary.
+3. Reminiscence: Conclude with at most ONE meaningful, gentle follow-up question (e.g. "Did you enjoy the evening?", "Who was with you that day?", "What did you do next?") to gently encourage the senior to share their memories.
+4. Active Continuity: Maintain conversational continuity across multi-turn exchanges. Always connect your response to what the senior just said and remember context from previous turns (e.g. references like "there", "she", "we", "with him", "that place", "the tea", "the sweets").
+5. Strict Grounding: NEVER invent family members, trips, or memories that are not in the verified records. If the senior mentions an event or person not in the records (such as a trip to Puri, a daughter's visit, or sweets), acknowledge it warmly and ask them to share more about it. Never claim you remember an unrecorded event.
 6. Language: Respond naturally and fluently in ${targetLangName}. If the senior speaks in another language or mixes languages, match their language warmly while keeping sentences clear and easy for an elderly ear.
 7. Output Format: You MUST output a JSON object matching this schema:
    {
-     "replyText": string (the warm response to be spoken aloud to the senior),
+     "replyText": string (the warm, concise 1-3 sentence response to be spoken aloud to the senior),
      "suggestedReplies": array of 2 to 3 short phrases (in the same language) that the senior can easily tap or say next
    }`;
 }
@@ -140,7 +142,8 @@ CORE CONVERSATIONAL BEHAVIORS:
  * Formats conversation history into bounded multi-turn contents for @google/genai
  */
 function formatConversationContents(conversationHistory, currentMessage) {
-  const boundedHistory = (Array.isArray(conversationHistory) ? conversationHistory : []).slice(-10);
+  // Preserve up to 24 turns (12 back-and-forth user/model exchanges) for rich multi-turn context
+  const boundedHistory = (Array.isArray(conversationHistory) ? conversationHistory : []).slice(-24);
   const contents = [];
 
   for (const turn of boundedHistory) {
@@ -225,8 +228,11 @@ async function callGeminiConversation({ systemInstruction, contents }) {
         const status = err.status || (err.message && err.message.includes('429') ? 429 : err.message && err.message.includes('503') ? 503 : null);
         logger.warn(`Gemini model ${model} attempt ${attempt + 1} failed (${status || err.message || 'unknown error'})`);
 
-        if ((status === 429 || status === 503) && attempt === 0) {
-          await new Promise(r => setTimeout(r, 1200));
+        // If quota exhausted (429), do not wait and retry the same model; advance immediately to next model candidate
+        if (status === 429) {
+          break;
+        } else if (status === 503 && attempt === 0) {
+          await new Promise(r => setTimeout(r, 1000));
         } else {
           break; // proceed to next candidate model
         }

@@ -120,11 +120,16 @@ class SmritiAudio {
   }
 
   /**
-   * Plays spoken greeting using Web Speech Synthesis API
+   * Plays spoken greeting using centralized VoiceService (OpenAI Neural TTS)
    * @param {string} text 
+   * @param {string} [lang='as']
    */
-  speakText(text = "Good morning Maa. Welcome to your memory space.") {
+  speakText(text = "Good morning Maa. Welcome to your memory space.", lang = 'as') {
     if (this.isMuted) return;
+    if (typeof window !== 'undefined' && window.VoiceService && typeof window.VoiceService.speak === 'function') {
+      window.VoiceService.speak(text, lang);
+      return;
+    }
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);

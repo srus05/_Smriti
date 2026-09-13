@@ -17,7 +17,8 @@
     "express": "^4.19.2",
     "firebase": "^10.14.1",
     "firebase-admin": "^12.7.0",
-    "multer": "^2.2.0"
+    "multer": "^2.2.0",
+    "openai": "^7.15.0"
   },
   "keywords": [
     "smriti",

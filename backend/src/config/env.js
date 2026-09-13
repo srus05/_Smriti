@@ -78,6 +78,11 @@ export const config = {
     clientSecret: process.env.ABDM_CLIENT_SECRET || null,
     gatewayUrl: process.env.ABDM_GATEWAY_URL || 'https://dev.abdm.gov.in/gateway',
     useMock: process.env.ABDM_USE_MOCK !== 'false',
+  },
+  openai: {
+    apiKey: process.env.OPENAI_API_KEY || null,
+    ttsModel: process.env.OPENAI_TTS_MODEL || 'gpt-4o-mini-tts',
+    ttsVoice: process.env.OPENAI_TTS_VOICE || 'shimmer',
   }
 };
 
@@ -86,6 +91,16 @@ export const isProduction = Boolean(
   process.env.VERCEL === '1' ||
   process.env.VERCEL_ENV === 'production'
 );
+
+let isFirestoreQuotaExhausted = false;
+
+export function setFirestoreQuotaExhausted(val = true) {
+  isFirestoreQuotaExhausted = Boolean(val);
+}
+
+export function getFirestoreQuotaExhausted() {
+  return isFirestoreQuotaExhausted;
+}
 
 export function shouldUseLocalFallback(isFirebaseLive = false) {
   const currentIsProd = Boolean(
