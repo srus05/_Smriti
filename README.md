@@ -148,11 +148,6 @@ Smriti uses a **performance-based adaptive engine** — not a trained ML model. 
 
 ---
 
-## 🎭 NER Cultural Personalization
-
-Cultural and regional context is woven into activity theming — including Bihu 🎉, tea gardens 🍃, the Brahmaputra 🌊, and Majuli 🏞️.
-
-> 🚧 *TBD — full list of cultural personalization points and caretaker configuration flow*
 
 ---
 
