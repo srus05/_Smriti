@@ -168,21 +168,24 @@ const ProfileClient = {
           window.offlineDb.get('settings', `profile_${elderlyUserId}`).catch(() => null)
         ]);
 
-        const photos = memories.filter(m => m.type === 'photo');
-        const audios = memories.filter(m => m.type === 'audio');
+        const userFamily = family.filter(item => item.elderlyUserId === elderlyUserId);
+        const userRoutines = routines.filter(item => item.elderlyUserId === elderlyUserId);
+        const userMemories = memories.filter(item => item.elderlyUserId === elderlyUserId);
+        const photos = userMemories.filter(m => m.type === 'photo');
+        const audios = userMemories.filter(m => m.type === 'audio');
 
         return {
           elderlyUserId,
           displayName: profileSettings?.profile?.displayName || 'Senior',
           greeting: 'Welcome back to your Memory Sanctuary ❤️',
           profile: profileSettings?.profile || { preferredLanguage: 'as' },
-          family: family || [],
+          family: userFamily,
           memories: {
-            total: memories.length,
+            total: userMemories.length,
             photos,
             audios
           },
-          routines: routines || [],
+          routines: userRoutines,
           reminders: [],
           accessibility: { largeText: true, highContrast: false }
         };

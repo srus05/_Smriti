@@ -125,6 +125,9 @@ class AuthStateManager {
       try {
         sessionStorage.clear();
       } catch (e) {}
+      if (typeof caches !== 'undefined') {
+        await Promise.all(['smriti-media-v1', 'smriti-api-v1'].map((name) => caches.delete(name)));
+      }
       this.loading = false;
       this.notify();
     }

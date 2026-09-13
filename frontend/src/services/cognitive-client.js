@@ -204,8 +204,8 @@ class CognitiveClient {
     let profile = null;
 
     try {
-      family = await offlineDb.getAll('family');
-      routines = await offlineDb.getAll('routines');
+      family = (await offlineDb.getAll('family')).filter(item => item.elderlyUserId === elderlyUserId);
+      routines = (await offlineDb.getAll('routines')).filter(item => item.elderlyUserId === elderlyUserId);
       const settings = await offlineDb.get('settings', `profile_${elderlyUserId}`);
       profile = settings?.profile || null;
     } catch (e) {}

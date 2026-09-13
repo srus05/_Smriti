@@ -13,7 +13,12 @@ const SmritiRouter = {
     const requestedRole = params.get('role') || 'elderly_user';
 
     const auth = window.smritiAuth;
-    if (!auth) return;
+    if (!auth) {
+      if (path.includes('senior-space') && !navigator.onLine) {
+        window.location.replace('/auth?role=elderly_user');
+      }
+      return;
+    }
 
     // Ensure AuthStateManager initialization is complete
     if (auth.ready) await auth.ready;
@@ -40,10 +45,11 @@ const SmritiRouter = {
         return;
       }
 
-      // Offline: allow Senior Space to load its offline fallback.
-      // Other protected shells still require authentication.
+      // Offline Senior Space is only available when AuthState retained a cached elderly session.
+      // Never manufacture an offline identity or allow another role into Senior Space.
       if (isSeniorSpace) {
-        return;
+        const cachedUser = auth.getUser?.();
+        if (cachedUser?.id && cachedUser.role === 'elderly_user') return;
       }
 
       console.warn('[Router] Offline access blocked for protected non-senior route.');

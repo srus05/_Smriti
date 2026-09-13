@@ -13,6 +13,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Lora:ital,wght@0,400;0,500;1,400;1,500&display=swap" rel="stylesheet" />
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -84,6 +86,10 @@
       <button id="senior-prepare-offline-btn" class="px-3.5 sm:px-4 py-2 rounded-full bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition-all shadow-sm flex items-center gap-1.5" title="Prepare cognitive activities for offline use">
         <span>📥</span>
         <span class="hidden md:inline">Prepare Offline</span>
+      </button>
+
+      <button id="senior-vr-launch-btn" class="px-3.5 sm:px-4 py-2 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-sm flex items-center gap-1.5" title="Open the 3D memory sanctuary">
+        <span>◉</span><span class="hidden lg:inline">3D Sanctuary</span>
       </button>
 
       <button id="senior-voice-greet-btn" class="px-3.5 sm:px-4 py-2 rounded-full bg-white border border-amber-300 text-amber-950 text-xs font-bold hover:bg-amber-100 transition-all shadow-sm flex items-center gap-1.5">
@@ -678,6 +684,14 @@
     </div>
   </div>
 
+  <div id="senior-vr-overlay" class="hidden fixed inset-0 z-[70] bg-slate-950" role="dialog" aria-modal="true" aria-label="3D memory sanctuary">
+    <div class="absolute top-4 left-4 z-10 flex items-center gap-3">
+      <button id="senior-vr-exit-btn" class="touch-target-senior rounded-xl bg-white/95 px-4 py-2 text-sm font-bold text-slate-900 shadow">Exit sanctuary</button>
+      <span id="senior-vr-mode-label" class="rounded-xl bg-slate-900/80 px-3 py-2 text-xs font-bold text-white"></span>
+    </div>
+    <div id="senior-vr-container" class="h-full w-full"></div>
+  </div>
+
   <!-- Toast Notification Container -->
   <div id="toast-container" class="fixed bottom-5 right-5 z-50 space-y-2 pointer-events-none"></div>
 
@@ -698,6 +712,7 @@
     import { offlineDb } from '/src/services/offline-db.js';
     import { offlinePrepService } from '/src/services/offline-prep-service.js';
     import { registerServiceWorker } from '/src/services/sw-register.js';
+    import { smritiVREngine } from '/src/components/vr/vr-engine.js';
 
     document.addEventListener('DOMContentLoaded', async () => {
       // 0. Register root Service Worker for offline shell and CDN caching
@@ -720,7 +735,8 @@
           window.location.href = '/auth?role=elderly_user';
           return;
         }
-        user = { id: 'offline_elderly_user', role: 'elderly_user', name: 'Senior' };
+        window.location.replace('/auth?role=elderly_user');
+        return;
       }
 
       const elderlyUserId = user.id;
@@ -732,6 +748,33 @@
       let currentHintsUsed = 0;
       let currentAttempts = 0;
       let sessionAnswers = [];
+
+      const vrOverlay = document.getElementById('senior-vr-overlay');
+      const vrContainer = document.getElementById('senior-vr-container');
+      const closeVr = () => {
+        if (smritiVREngine.isSessionActive) smritiVREngine.exit();
+        vrOverlay?.classList.add('hidden');
+      };
+      document.getElementById('senior-vr-exit-btn')?.addEventListener('click', closeVr);
+      document.getElementById('senior-vr-launch-btn')?.addEventListener('click', async () => {
+        const mode = 'vr';
+        const modeLabel = document.getElementById('senior-vr-mode-label');
+        if (modeLabel) modeLabel.textContent = 'Entering VR or 3D preview…';
+        vrOverlay?.classList.remove('hidden');
+        await smritiVREngine.start({
+          containerEl: vrContainer,
+          expData: expData || {},
+          sessionToken: localStorage.getItem('smriti_session_token') || sessionStorage.getItem('smriti_session_token') || '',
+          mode,
+          elderlyUserId,
+          currentPack,
+          cognitiveClient,
+          voiceService,
+          onSpeak: (text, language) => voiceService.speak(text, language),
+          onRecordSession: (session) => cognitiveClient.recordSession(session),
+          onExit: () => vrOverlay?.classList.add('hidden')
+        });
+      });
 
       // 2. Setup Real-time Connectivity Indicator
       const offlinePill = document.getElementById('senior-offline-pill');
@@ -946,7 +989,7 @@
           } else {
             const allLocal = await offlineDb.getAll('activities');
             if (allLocal && allLocal.length > 0) {
-              currentPack = { activities: allLocal };
+              currentPack = { activities: allLocal.filter(activity => activity.elderlyUserId === elderlyUserId) };
             }
           }
         }

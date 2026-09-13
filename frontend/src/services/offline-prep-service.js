@@ -38,7 +38,7 @@ class OfflinePrepService {
       notify(1, 'Caching Application Shell & Core Styles...', 10);
 
       if ('caches' in window) {
-        const shellCache = await caches.open('smriti-shell-v1');
+        const shellCache = await caches.open('smriti-shell-v2');
         const coreUrls = [
           '/',
           '/senior-space',
@@ -62,6 +62,15 @@ class OfflinePrepService {
           '/src/components/audio.js',
           '/src/auth/auth-state.js',
           '/src/utils/router.js',
+          '/src/services/sw-register.js',
+          '/src/components/vr/vr-ui.js',
+          '/src/components/vr/vr-engine.js',
+          '/src/components/vr/vr-interaction.js',
+          '/src/components/vr/vr-atmosphere.js',
+          '/src/components/vr/vr-memory-wall.js',
+          '/src/components/vr/vr-game-session.js',
+  '/src/components/vr/vr-talk-companion.js',
+          '/src/components/vr/vr-talk-companion.js',
           '/manifest.json'
         ];
 
@@ -77,6 +86,7 @@ class OfflinePrepService {
         const cdnCache = await caches.open('smriti-cdn-v1');
         const cdnUrls = [
           'https://cdn.tailwindcss.com',
+          'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js',
           'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Lora:ital,wght@0,400;0,500;1,400;1,500&display=swap'
         ];
         for (const cdnUrl of cdnUrls) {

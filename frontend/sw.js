@@ -32,12 +32,20 @@ const CORE_SHELL_URLS = [
   '/src/components/audio.js',
   '/src/auth/auth-state.js',
   '/src/utils/router.js',
-  '/src/sw-register.js',
+  '/src/services/sw-register.js',
+  '/src/components/vr/vr-ui.js',
+  '/src/components/vr/vr-engine.js',
+  '/src/components/vr/vr-interaction.js',
+  '/src/components/vr/vr-atmosphere.js',
+  '/src/components/vr/vr-memory-wall.js',
+  '/src/components/vr/vr-game-session.js',
+  '/src/components/vr/vr-talk-companion.js',
   '/manifest.json'
 ];
 
 const EXTERNAL_CDN_URLS = [
   'https://cdn.tailwindcss.com',
+  'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js',
   'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Lora:ital,wght@0,400;0,500;1,400;1,500&display=swap'
 ];
 
@@ -151,38 +159,8 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // D. Read-only dynamic APIs: /api/preview/* or /api/cognitive/activities/*
-  if (url.pathname.startsWith('/api/preview') || url.pathname.startsWith('/api/cognitive/activities')) {
-    event.respondWith(
-      (async () => {
-        try {
-          // Network First with 2500ms timeout
-          const controller = new AbortController();
-          const timer = setTimeout(() => controller.abort(), 2500);
-          const response = await fetch(request, { signal: controller.signal });
-          clearTimeout(timer);
-
-          if (response && response.status === 200) {
-            const cache = await caches.open(API_CACHE);
-            cache.put(request, response.clone());
-            return response;
-          }
-        } catch (e) {
-          // Network failed or timed out -> serve cached API payload
-        }
-
-        const cached = await caches.match(request);
-        if (cached) {
-          return cached;
-        }
-        return new Response(JSON.stringify({ offline: true, error: 'Offline - cached data unavailable' }), {
-          status: 503,
-          headers: { 'Content-Type': 'application/json' }
-        });
-      })()
-    );
-    return;
-  }
+  // D. Authenticated API payloads are intentionally never stored in Cache Storage.
+  // Offline profile and activity data is scoped in IndexedDB by elderly user ID instead.
 
   // E. CDN resources (Tailwind, Google Fonts, UNPKG)
   if (url.hostname.includes('cdn.tailwindcss.com') ||
@@ -211,28 +189,8 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // F. Media files (Photos, Audios, Avatars)
-  if (request.destination === 'image' || request.destination === 'audio' || url.pathname.match(/\.(png|jpg|jpeg|webp|svg|mp3|wav|ogg)$/i)) {
-    event.respondWith(
-      (async () => {
-        const cached = await caches.match(request);
-        if (cached) return cached;
-
-        try {
-          const res = await fetch(request);
-          if (res && res.status === 200) {
-            const cache = await caches.open(MEDIA_CACHE);
-            cache.put(request, res.clone());
-          }
-          return res;
-        } catch (e) {
-          // Return cached if available, else empty fallback
-          return cached || Response.error();
-        }
-      })()
-    );
-    return;
-  }
+  // F. Do not automatically cache user media. Explicit offline preparation owns its
+  // selected media cache and can be cleared on sign-out; this avoids cross-account leakage.
 
   // G. Static assets (Local CSS, JS, JSON) -> Cache First with background refresh
   event.respondWith(
