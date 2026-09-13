@@ -8,7 +8,8 @@ class AuthStateManager {
     this.user = null;
     this.loading = true;
     this.listeners = new Set();
-    this.init();
+    // ready promise resolves when init finishes – used by router guards
+    this.ready = this.init();
   }
 
   async init() {
@@ -32,13 +33,19 @@ class AuthStateManager {
         this.user = null;
       }
     } catch (e) {
-      console.warn('[AuthStateManager] Session check expired or failed:', e.message);
-      this.user = null;
-      if (window.ApiClient) window.ApiClient.clearSession();
-    } finally {
-      this.loading = false;
-      this.notify();
+      console.warn('[AuthStateManager] Session check failed:', e.message);
+      const isNetworkError =
+        e instanceof TypeError && e.message.includes('Failed to fetch');
+      if (isNetworkError) {
+        console.info('[AuthStateManager] Offline (network error) – retaining cached authentication state');
+      } else {
+        this.user = null;
+        if (window.ApiClient) window.ApiClient.clearSession();
+      }
     }
+
+    this.loading = false;
+    this.notify();
   }
 
   onAuthStateChanged(callback) {
@@ -58,6 +65,11 @@ class AuthStateManager {
   }
 
   async signInWithGoogle(intendedRole = 'elderly_user') {
+    // If GoogleAuthClient hasn't loaded yet, wait for its initPromise
+    if (window.GoogleAuthClient && window.GoogleAuthClient.initPromise) {
+      await window.GoogleAuthClient.initPromise;
+    }
+
     if (!window.GoogleAuthClient || !window.ApiClient) {
       throw new Error('Auth clients not initialized');
     }

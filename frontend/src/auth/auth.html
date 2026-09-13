@@ -6,6 +6,7 @@
   <title>Sign In | Smriti Memory Platform</title>
   <meta name="description" content="Sign in to your personalized Smriti Memory Sanctuary or Caretaker Studio." />
   <meta name="theme-color" content="#FDFBF7" />
+  <link rel="manifest" href="/manifest.json" />
 
   <!-- Google Fonts: Plus Jakarta Sans & Lora -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -292,6 +293,29 @@
   <script src="/src/services/media-client.js"></script>
   <script src="/src/auth/auth-state.js"></script>
   <script src="/src/utils/router.js"></script>
+  <script src="/src/services/sw-register.js" type="module"></script>
+  <script>
+    // Explicitly invoke Service Worker registration to guarantee it runs on this page
+    if (typeof window !== 'undefined' && typeof window.registerServiceWorker === 'function') {
+      window.registerServiceWorker().catch(err => console.warn('[SW] Registration invocation failed:', err));
+    } else if ('serviceWorker' in navigator) {
+      // Fallback registration if sw-register module failed to expose the function
+      navigator.serviceWorker.register('/sw.js', { scope: '/' })
+        .then(reg => console.log('[SW] Registered via fallback with scope:', reg.scope))
+        .catch(err => console.warn('[SW] Fallback registration failed:', err));
+    }
+  </script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js', { scope: '/' })
+        .then(reg => {
+          console.log('[SW] Service Worker registered successfully with scope:', reg.scope);
+        })
+        .catch(err => {
+          console.warn('[SW] Service Worker registration notice:', err.message);
+        });
+    }
+  </script>
 
   <script>
     document.addEventListener('DOMContentLoaded', () => {
