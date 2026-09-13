@@ -45,9 +45,8 @@ Elderly dementia patients face a compounding set of challenges: declining memory
 
 ---
 
-## ✅ SIH Problem Statement Alignment
 
-| SIH Requirement | Smriti Implementation |
+ | Smriti Implementation |
 |---|---|
 | 🧠 Memory improvement | Personalized memory-recall activities from family, photos, life context |
 | 🎯 Attention and concentration | Dedicated Attention & Focus activity category |
